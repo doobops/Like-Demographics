@@ -69,14 +69,10 @@
             "retained", "d75", "d79", "overall_rating", "mosl_rating", "motp_rating",
             "black", "white", "asian", "hispanic")
     
-    fx_ttest = function(x){
-      t.test(joined[,x] ~ joined[,'likedem'])
-    }
-    
     diff_mean_cov = 
-      lapply(cov, fx_ttest)
+      map(joined[,c(cov)], ~ t.test(. ~ joined[,"likedem"]))
     
-    names(diff_mean_cov) = cov
+    diff_mean_cov <- set_names(diff_mean_cov, cov)
 
     for(i in 1:length(cov)){
       if(diff_mean_cov[[cov[i]]]$p.value < 0.05){
