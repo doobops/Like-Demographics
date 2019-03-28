@@ -2,16 +2,18 @@
 # Variables:    
       # -- Outcome variable = posttest score i.e. 'zeed'
       # -- Treatment variable = demographic matchup i.e. 'likedem'
-      # -- Covariates = predictors of demographic matchup i.e. "age.s", "pamath", "paela", "likegen", "ell", "sped", "ed", "retained", "d75", "d79"  
+      # -- Covariates = predictors of demographic matchup e.g. "age.s", "pamath", "paela", "likegen", "ell", "sped", "ed", "retained", "d75", "d79"  
 
 # Setup    
     rm(list=ls())
     
     require(tidyverse)
     require(dplyr)
+    require(plyr)
     require(haven)
     require(MatchIt)
     require(purrr)
+    require(stringi)
     
     path = "//es02cifs03/ord$/BumbleB/Ratings and Demographics Research/Like Demos/"
 
@@ -43,13 +45,13 @@
       inner_join(sdemos, scores, by=c("student_id", "fiscal_year")) %>%
       inner_join(., tdemos, by=c("employeeid", "fiscal_year"), suffix = c(".s", ".t")) %>%
       mutate(likedem = ifelse(hispanic == 1 & ethnicity == "HIS" | black == 1 & ethnicity == "BLK" | asian == 1 & ethnicity == "ASN" | white == 1 & ethnicity == "WHT", 1, 0),
-             likegen = ifelse(male.s ==1 & male.t == 1, 1, 0))
+             likegen = ifelse(male.s ==1 & male.t == 1, 1, 0)) %>%
+      filter(fiscal_year==2018)
 
 
 # 1. Check if dataset is unbalanced
     mean(joined$likedem)
-      # -- 31.18% like demo
-      # -- 68.82% diff demo
+      # -- 31.16% like demo
       # -- Fairly unbalanced, 1:2 ratio. Let's go ahead and generate propensity scores for likedem
 
     
@@ -86,13 +88,13 @@
 
 
 # Estimate likelihood by running logit model, where response variable is likedem and RHS are those we found were significantly related to likedem 
-    mod_p = glm(likedem ~ age.s + age.t + pamath + paela + likegen + ell + sped + ed + retained + d75 + motp_rating + mosl_rating + fiscal_year + ela,
+    mod_p = glm(likedem ~ age.s + age.t + pamath + paela + likegen + ell + sped + ed + retained + d75 + motp_rating + mosl_rating + ela,
                 family = binomial(), data = joined)
 
     summary(mod_p)
-        # -- All coefficients are significant except sped. Drop d79 from RHS
+        # -- All coefficients are significant except sped, mosl_rating. Drop d79 from RHS
 
-    mod_p_reduced = glm(likedem ~ age.s + age.t + pamath + paela + likegen + ell + ed + retained + d75 + motp_rating + mosl_rating + fiscal_year + ela,
+    mod_p_reduced = glm(likedem ~ age.s + age.t + pamath + paela + likegen + ell + ed + retained + d75 + motp_rating + ela,
                  family = binomial(), data = joined)
     
     summary(mod_p_reduced)
@@ -114,11 +116,11 @@
 
 # Matching algorithm
     joined_nomiss = joined %>%  # MatchIt does not allow missing values
-      select(zeed, likedem, fiscal_year, ela, one_of(cov)) %>%
+      select(zeed, likedem, age.s, age.t, pamath, paela, likegen, ell, ed, retained, d75, motp_rating, ela) %>%
       na.omit()
     
     matched = 
-      matchit(likedem ~ age.s + age.t + pamath + paela + likegen + ell + ed + retained + d75 + motp_rating + mosl_rating + fiscal_year + ela, 
+      matchit(likedem ~ age.s + age.t + pamath + paela + likegen + ell + ed + retained + d75 + motp_rating + ela, 
                      method = "nearest", data = joined_nomiss)
 
     summary(test)  
